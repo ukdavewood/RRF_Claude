@@ -342,18 +342,14 @@ Possible debug symbols or an unintended change. Ask Claude to diff your source t
 
 ---
 
-## Emergency Recovery (BOSSA — 6HC)
+## Emergency Recovery (BOSSA — 6HC,  USB Mini5+)
 
 Only needed if normal DWC flashing fails and the board won't boot.
+NB/ You need a windows machine for BOSSA for a 6HC, Mac is ok for Mini5+
 
-1. Download **BOSSA**: https://github.com/shumatech/BOSSA/releases
-2. Connect the 6HC via **USB** (not Ethernet).
-3. Enter bootloader mode: **hold the BOOT button, power on the board, release BOOT after 2–3 s.**
-4. In BOSSA, select the board's port ("Duet3 Bootloader" or similar).
-5. Select your firmware `.bin` (your known-good/official file if recovering), click **Upload**, wait for success.
-6. Power-cycle or reset — the board should boot normally.
+https://docs.duet3d.com/User_manual/RepRapFirmware/Updating_firmware
 
-BOSSA is recovery only; normal updates always go through DWC.
+
 
 ---
 
@@ -371,7 +367,6 @@ BOSSA is recovery only; normal updates always go through DWC.
 - **RepRapFirmware source (and dependencies):** https://github.com/Duet3D
 - **ARM GNU toolchain downloads:** https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads
 - **DuetWebControl:** https://github.com/Duet3D/DuetWebControl
-- **BOSSA (6HC recovery):** https://github.com/shumatech/BOSSA
 - **Claude Code:** https://claude.com/claude-code
 
 Happy building!
