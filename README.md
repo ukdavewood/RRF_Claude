@@ -5,8 +5,9 @@ Practical, real-world guides to getting things done with **[Claude Code](https:/
 ## Guides
 
 - **[Building (and Enhancing) RepRapFirmware with Claude Code](claude-docs/Building-RRF-with-Claude-Code.md)** — compile RepRapFirmware for Duet3D boards on Windows or macOS, then add your own features to the firmware, without needing to be a programmer.
+- **[Building a Forum Post Capture Chrome Extension with Claude Code](claude-docs/Building-a-Forum-Post-Capture-Extension.md)** — build a Chrome extension that captures a forum thread (posts and images) to a local database and exports it as Markdown, a ZIP, or HTML — for offline keeping and handing to Claude for analysis.
 
-*More guides are in preparation (a Chrome extension for archiving and exporting forum threads, and GCode post-processors for simulation).*
+*More guides are in preparation (GCode post-processors for simulation).*
 
 ## About
 
