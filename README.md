@@ -6,9 +6,10 @@ Practical, real-world guides to getting things done with **[Claude Code](https:/
 
 - **[Building (and Enhancing) RepRapFirmware with Claude Code](claude-docs/Building-RRF-with-Claude-Code.md)** — compile RepRapFirmware for Duet3D boards on Windows or macOS, then add your own features to the firmware, without needing to be a programmer.
 - **[Building a Forum Post Capture Chrome Extension with Claude Code](claude-docs/Building-a-Forum-Post-Capture-Extension.md)** — build a Chrome extension that captures a forum thread (posts and images) to a local database and exports it as Markdown, a ZIP, or HTML — for offline keeping and handing to Claude for analysis.
+- **[Building a 2-Reader NFC Filament Sensor](claude-docs/two-board-nfc-reader-build-guide.md)** — wire two PN5180 NFC readers to an ESP32 and get an AI coding assistant to write the firmware, reading both Bambu Lab and OpenPrintTag filament spool tags.
 
 *More guides are in preparation (GCode post-processors for simulation).*
 
 ## About
 
-These guides are reviewed, versioned, and published from a dedicated documentation project. They share a common house style and structure so each one reads the same way.
+These guides are reviewed, versioned, and published from a dedicated documentation project. They share a common house style and structure — described in **[Writing Claude Code Guides](claude-docs/Writing-Claude-Code-Guides.md)** — so each one reads the same way.
