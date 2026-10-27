@@ -9,6 +9,7 @@ Practical, real-world guides to getting things done with **[Claude Code](https:/
 - **[Building a 2-Reader NFC Filament Sensor](claude-docs/two-board-nfc-reader-build-guide.md)** — wire two PN5180 NFC readers to an ESP32 and get an AI coding assistant to write the firmware, reading both Bambu Lab and OpenPrintTag filament spool tags.
 - **[Automating BambuStudio Plate Labels with Claude Code](claude-docs/Automating-BambuStudio-Plate-Labels-with-Claude-Code.md)** — get Claude Code to build a macOS script that drives the real BambuStudio app to add a name label to every plate of a multi-plate project, optionally from a Stream Deck button.
 - **[Creating 4K Fusion Animations with Claude Code](claude-docs/Creating-4K-Fusion-Animations-with-Claude.md)** — get Claude Code to build a small Autodesk Fusion add-in and naming scheme that turns a 3D model into 4K animation frames (parts appearing group by group, camera orbits, exploded views), ready to assemble into a video.
+- **[Building SolidCraft for iPad with Claude Code](claude-docs/Building-SolidCraft-for-iPad-with-Claude-Code.md)** — get Claude Code to port an open-source Rust CAD program to run natively on an iPad, then optionally add an AI assistant that drives it by text or voice (Apple's on-device model, Claude online, or a small offline model).
 
 *More guides are in preparation (GCode post-processors for simulation).*
 
