@@ -4,7 +4,7 @@ You have an open-source desktop CAD program written in Rust and you want it runn
 
 This is a real-world write-up. It was done end to end on a Mac and an iPad Pro over about three days (25 to 27 October 2026), starting from the open-source [SolidCraft](https://github.com/tangency-labs/solidcraft) v0.18.0 source. You don't need to be a programmer, but you do need to be comfortable approving steps and testing on a real device.
 
-> **Scope and caveats.** Written for **macOS with Xcode**, targeting an **iPad** (tested on an iPad Pro 12.9-inch, M2, iPadOS 26). **Not tested on iPhone, Windows or Linux** (building iOS apps needs a Mac). It is an independent, unofficial guide: not affiliated with or endorsed by the SolidCraft project (`tangency-labs`), Apple or Anthropic. The result is a personal, work-in-progress port, not a supported product. Timings and costs are from one setup, so treat them as examples.
+> **Scope and caveats.** Written for **macOS with Xcode**, targeting an **iPad** (tested on an iPad Pro 12.9-inch, M2, iPadOS 26). **Only lightly tested on iPhone and in the iPhone Duo simulator** (see Part 3), **not tested on Windows or Linux** (building iOS apps needs a Mac). It is an independent, unofficial guide: not affiliated with or endorsed by the SolidCraft project (`tangency-labs`), Apple or Anthropic. The result is a personal, work-in-progress port, not a supported product. Timings and costs are from one setup, so treat them as examples.
 
 ## The core idea
 
@@ -23,7 +23,7 @@ Most instructions below are phrased as things to ask Claude, not commands you ty
 - For the optional AI part: an **Anthropic API key** for the online tier (our testing, including many demo runs, cost about $0.14 with Claude Haiku), and about 2.3 GB of iPad storage for the offline model.
 - The SolidCraft source, as a git repository on your Mac. Everything else is installed in Step 0 and Step 1.
 
-> **Heads-up on permissions:** Claude asks before running commands, and iOS builds run a lot of them. The "Reduce approval prompts" section near the end pre-approves the safe, repetitive ones. Risky actions still prompt.
+> **Heads-up on permissions:** Claude asks before running commands, and iOS builds run a lot of them. Read each command before you approve it; risky actions always prompt.
 
 ---
 
@@ -169,31 +169,46 @@ We tested nine. **Qwen3-4B-Instruct-2507 (4-bit MLX)** scored 22/23, equal best 
 
 ---
 
-## Reduce approval prompts (optional settings file)
+## Part 3 (optional) — iPhone and the iPhone Duo
 
-iOS builds run the same safe commands over and over. Put a `.claude/settings.json` in your project to pre-approve them. Adjust the paths to your own project; risky commands (deleting files, pushing to git, anything outside the project) still prompt.
+The same app also runs on an iPhone (it is the iPad app on a smaller screen), and Xcode 27 adds a simulator for a folding phone, the **iPhone Duo**. Testing on the Duo showed one change the app needed and several things worth knowing. This was checked in the iOS 27.1 simulator and on an iPhone; it was **not** tested on a real Duo.
 
-```json
-{
-  "permissions": {
-    "allow": [
-      "Bash(./build_device.sh:*)",
-      "Bash(xcodegen generate:*)",
-      "Bash(xcodebuild -project SolidCraft.xcodeproj:*)",
-      "Bash(cargo check:*)",
-      "Bash(cargo build:*)",
-      "Bash(xcrun devicectl list devices:*)",
-      "Bash(xcrun devicectl device info files:*)",
-      "Bash(xcrun devicectl device copy:*)",
-      "Bash(git status:*)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)"
-    ]
-  }
-}
-```
+## Change 1 — adopt the UIScene lifecycle (needed for the iOS 27 SDK)
 
-> **Note:** a build that adds Swift packages with macros needs `-skipMacroValidation -skipPackagePluginValidation`. Claude Code's safety checks may stop it and ask. That is working as intended: read the command and approve it yourself, or add the specific build script to the allow list. Note that allowing `./build_device.sh` lets Claude run whatever that script contains, including installing to your iPad, so read the script once first.
+An app built with the iOS 27 SDK that has no scene setup refuses to start: *"UIScene life cycle is required for apps built with this SDK."* The windowing library the port uses (winit 0.30) predates scenes, and no released version fixes it yet. A fix is proposed upstream (winit pull request 4723), written for the newer 0.31 code.
+
+> Run the app in the iPhone Duo simulator and tell me the error. Then make the app use the UIScene lifecycle: add a scene manifest to `Info.plist` and remove `UIRequiresFullScreen`, and patch winit so it waits for the first scene to connect before starting, and attaches its window to that scene. Keep the patched copy in a `vendor/` folder with an attribution row, and tell me when upstream makes it unnecessary.
+
+- **Claude will** copy winit into `vendor/`, add the scene wait and window attachment (a few dozen lines), point the workspace at it with a `[patch.crates-io]` entry, and edit `Info.plist`.
+- **Verify:** the app starts in the Duo simulator at the folded size (about 466 × 678 points) and again on an iPad simulator running iOS 26, which shows the change doesn't break older systems.
+- **Why it matters later:** an app built with an older SDK keeps running on newer iOS for now, so this isn't urgent until you build with the iOS 27 SDK. Drop the patched copy when winit and eframe release the upstream fix.
+
+## Change 2 — build for the simulator, not only the device
+
+An Xcode run for a simulator fails to install with *"does not contain code for any platform and CPU architecture combination that is runnable on this device"* if the pre-build script always compiles for the iPad. Ask Claude to make the script check Xcode's `PLATFORM_NAME`: `aarch64-apple-ios-sim` for a simulator, `aarch64-apple-ios` for a device.
+
+From the command line, use `xcodebuild -project SolidCraft.xcodeproj -scheme SolidCraft -destination 'platform=iOS Simulator,id=<simulator id>' -skipMacroValidation -skipPackagePluginValidation build`, then `xcrun simctl install`. In Xcode, the first run stops until you approve the package macro it needs (Trust and Enable).
+
+## Change 3 — a file-picking bug that empties files
+
+Opening a file from the app's own Documents folder through the document picker copied the file onto itself, which emptied it (0 bytes). The fix is to skip the copy when the picked file already is the working copy. **The iPad has the same bug.**
+
+> When the picker returns a file that is already in the app's Documents folder, use it as it is; don't copy it onto itself.
+
+## Things to know about the Duo simulator (Xcode 27)
+
+- There is no separate Simulator app. The simulator window is inside Xcode, and the Duo may not appear in its device list until you restart the Mac or the simulator service. Running from Xcode with the Duo as the destination is the reliable way to get it on screen.
+- **Option** shows the fold slider. It does not give you two-finger gestures. Pan with Space and drag, or the pan icon in the navigation bar.
+- **Unfolded, the mouse did nothing** in any app, including Safari. Toggling **Hardware → Keyboard** (hardware or software keyboard) in the simulator fixed it.
+- Copy files in by putting them in the app's Documents folder (`xcrun simctl get_app_container booted <bundle id> data`), then open them from the picker.
+- The Duo reports an 84-point strip on the right as a safe-area inset (clock and Wi-Fi), so the app should keep clear of it.
+
+## What is still to do
+
+- The iPad layout is simply scaled to the folded screen: the ribbon is cut off, the keypad is too large and the Browser panel takes half the width. A compact layout for narrow screens is the next job.
+- Folding and unfolding resize the app correctly, but behaviour while the app is mid-fold has not been tested beyond launching at each size.
+
+---
 
 ## Organising your files
 
