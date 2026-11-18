@@ -2,7 +2,7 @@
 
 You have a CAD design on your Mac and a Meta Quest 3. You want to stand in your room, see the design at table size over the real furniture, pick parts with the controllers, and change the design by talking to it ("make the selected sails red", "fillet this edge", "scale the whole ship by half"). This guide shows how to get there by asking Claude Code for each piece: a small OpenXR app for the headset, a server on your Mac that drives SolidCraft, and an AI that does the editing.
 
-This is a real-world write-up of an **experiment**. It was built end to end in about three days (15 to 17 November 2026) on a Mac and a Quest 3, starting from the open-source [SolidCraft](https://github.com/tangency-labs/solidcraft) command-line program (v0.41). You don't need to be a programmer, but you do need to be comfortable approving steps, wearing the headset to test, and describing what you see.
+This is a real-world write-up of an **experiment**. It was built end to end in about three days (15 to 17 November 2026) on a Mac and a Quest 3, and extended on 18 November with sketches and dimensions (Part 4), starting from the open-source [SolidCraft](https://github.com/tangency-labs/solidcraft) command-line program (v0.41). You don't need to be a programmer, but you do need to be comfortable approving steps, wearing the headset to test, and describing what you see.
 
 > **Scope and caveats.** Written for a **Mac** and a **Quest 3** (the headset's software was Horizon OS with OpenXR runtime "Oculus 210.117"). **Not tested on Windows or Linux** (the server is plain Python and should port, but the voice and keychain parts were only run on macOS) and not tested on other headsets. It is an independent, unofficial guide: not affiliated with or endorsed by the SolidCraft project (`tangency-labs`), Meta or Anthropic. The result is a personal, experimental tool, not a supported product. Timings, costs and menu names are from one setup and may change with system updates, so treat them as examples.
 
@@ -158,11 +158,57 @@ The server listens on your local network and can change your design and spend yo
 
 - **What happened for us:** the headset's runtime did not list the usual scene and anchor extensions (`XR_FB_scene`, `XR_FB_spatial_entity`), even with the scene permission granted. It did list `XR_META_environment_raycast`, which casts a ray against the real room. That extension was newer than the Rust OpenXR bindings, so we asked Claude to write the structures and function calls by hand from the OpenXR header, and it worked. The raycast only returns hits inside the headset cameras' view, so look towards the surface as well as pointing.
 - **Real size:** designs are in millimetres, so a small part is set down at its true size; a large one (a ship, a building) is scaled to a tabletop. A Size button steps 0.5×, 1×, 2×, 4× of the file's size (our models are 1:1000, so ×2 gives 1:500).
+- **Near surfaces the scan misses:** the room scan did not find surfaces very close to the headset, such as the front edge of a desk, so the marker fell back to a point in mid-air. We asked Claude to remember the height of the last flat, upward-facing surface the raycast found and, when the ray misses but points downwards, to use the same height. Aim at the far part of the desk first and the front then works.
 - **Keeping it there:** we saved the placement relative to the headset's stage space. Meta's documentation advises spatial anchors for this, and says the stage origin can move for apps that run without a boundary, so treat it as unreliable until you have tested it across restarts.
 
 ### A keyboard and mouse
 
 A Bluetooth keyboard and mouse can be paired with the Quest and used in the app. Mouse movement needs Android **pointer capture**; a mouse the app has not captured sends nothing. We first asked for capture only after a mouse event arrived, which never happens, so the mouse was silent until we asked for capture at start-up. Shortcut keys (Ctrl+Z undo, F1 help) and an on-screen keyboard are in the app.
+
+With the mouse, left click selects, the right button turns the model, the wheel resizes it, and **Shift with the right button or the wheel moves it** (sideways and up/down, or nearer and further). The app only sees the keys and mouse events it is sent, so Shift has to reach it as its own event.
+
+**Use the keyboard and mouse that are connected to your Mac:** instead of pairing them with the headset, you can ask Claude to relay them. A **Mac keys** button in the app asks the server to capture the Mac's keyboard and mouse and send them to the headset over UDP, so nothing is paired and nothing has to be switched back.
+
+> Add a Mac keys button. When it is on, capture the Mac's keyboard and mouse with a macOS event tap in the server (swallow them on the Mac), send them to the headset as UDP datagrams carrying the access code, and treat them like a paired keyboard and mouse. Give them back when I press the button again, when I press Tab in the headset, when the headset loses focus or is taken off (a heartbeat from the headset every second; let go after four seconds of silence), and on a fixed chord on the Mac (Ctrl+Option+Esc) as a way out.
+
+- **What to know:** macOS asks for Accessibility and Input Monitoring permission for the program that runs the server. A first version captured nothing because the event loop ran in the wrong mode (RunInMode needs the default mode, not the common-modes name). Swallowing mouse-move events doesn't stop the pointer moving on the Mac, so also detach the pointer from the mouse while captured (`CGAssociateMouseAndMouseCursorPosition`). With passthrough on, taking the headset off only loses focus rather than ending the session, so release on loss of focus rather than waiting for the session to go idle.
+
+---
+
+## Part 4 — Parametric sketches
+
+A model built from a sketch and dimensions changes when you change a dimension. This part shows the sketch in the room, with its dimensions and constraints, and lets you change a dimension by selecting it and saying a number.
+
+### How it works, in short
+
+1. A **parametric model** is built from a sketch (an outline, holes and a circle for a boss) whose sizes are fixed by dimensions, plus extrusions made from the sketch. Changing a dimension rebuilds the sketch and everything built from it.
+2. The headset asks the Mac for the **design tree** (SolidCraft's timeline: the sketches and features, in order) and shows it as a list. Pick a sketch.
+3. The server asks SolidCraft for the sketch's curves and draws them on the sketch's plane over the model. In our setup SolidCraft's `inspect_design` lists the sketches and the timeline, and `sketch.inspect` and `sketch.export_dxf` give the curves, points, constraints and dimensions.
+4. **Dimensions** appear as labels with dimension lines and arrowheads (for example `plate_w = 80`), and **constraints** (horizontal, vertical, coincident and so on) as small boxes. Select one or more with the pointer; they turn orange.
+5. Hold the trigger and say, for example, "change to 18". The server sends Claude the selected items with the named parameter behind each one. Claude changes the parameter with SolidCraft's `set_parameter` command, SolidCraft rebuilds, and the headset shows the new shape and redraws the sketch a moment later.
+
+### A test model with one sketch
+
+Ask Claude to build a small model for testing:
+
+> Build a test part in SolidCraft through MCP with ONE sketch on the XY plane: an 80 x 50 mm plate outline, two 8 mm holes dimensioned from the corners (the second from the opposite corner, so they stay symmetric), a 24 mm boss circle centred on the plate with plate_w / 2 and plate_h / 2, and a 10 mm bore circle concentric with it. Give every dimension a named parameter (plate_w, plate_h, hole_d, hole_x, hole_y, boss_d, bore_d). The sketch should be fully constrained. Then extrude the outline profile as the plate and join the boss ring profile as the boss, leaving the holes and bore open. Check that changing plate_w rebuilds the model.
+
+- **What happened for us:** the sketch had 17 constraints and no free movement left, and changing one parameter recomputed three features. Remember that SolidCraft numbers the profiles of a sketch (the outline with its holes, each hole, the boss ring, the bore); extrude by profile index.
+
+### Showing the sketch and its dimensions
+
+> Add a Sketches button that lists the design tree from the Mac and lets me pick a sketch to show over the model, one at a time, drawn as thin lines even when they are inside the solid. A pressed button hides it again. Refresh the sketch only when the design changes, not on a timer.
+
+> Draw each dimension as a label with a dimension line and arrowheads, and each constraint as a small box. Make the text and the arrowheads a fixed size on screen, whatever the size of the model, and hide them when there is no room: arrowheads first, then the dimension. Let me point at a label, select it, and send the selected ones with my next request.
+
+- **Refresh:** the Mac already announces each new design version, so the headset fetches the sketch again only when that version changes, not on a timer. We first used a timer, then replaced it.
+- **Keep the server stateless about the view:** the headset should say which sketch it is showing with each request. When the server remembered the choice, opening another model made the two disagree and the labels went stale.
+- **Draw order:** lines are drawn without a depth test so a sketch that lies inside the solid is still visible.
+- **Deselect after a request:** selected items go with the next request, so a dimension you forgot to deselect gets changed along with the new one. We deselect them once the request has been answered. The AI says when two dimensions were selected and it had to guess.
+
+### Keep each CAD program behind an adapter
+
+The headset only needs a few things from the CAD program: a mesh, a list of bodies, a design tree, a sketch's curves, dimensions and constraints, and a way to run an edit. We kept the SolidCraft specifics in one adapter file on the server, with the contract written down, so the same viewer could later be pointed at another program (we plan a Fusion version). Ask Claude to keep program-specific code in one place from the start; it makes guides and sample code easier to share per tool.
 
 ---
 
@@ -191,8 +237,14 @@ It needs pointer capture. Pair it, then ask Claude to request capture as soon as
 ### The AI says "Done" but nothing changed
 Ask Claude to log each tool call and the stop reason. A cut-off answer or an expensive loop is the usual cause.
 
+### The keyboard stays captured, or Mac keys won't switch on
+The Mac only releases the keyboard and mouse when the headset says so, goes quiet for four seconds, or you press Ctrl+Option+Esc on the Mac. Check that macOS has allowed Accessibility and Input Monitoring for the program that runs the server. A pressed Tab in the headset also gives them back.
+
+### A sketch won't clear, or its labels show an old value
+Press the Sketches button again (it reads Hide sketch while one is on view). If a label is stale, the headset and server disagree about which sketch is shown or which design version it has; ask Claude to make the headset send the sketch id with every request and to refetch when the design version changes.
+
 ### Photos and recordings
-The Quest's own camera can take photos and record video. Recording and photos can't be started from your own app (the camera service is protected), but `adb` can take a photo over a cable, which a server button can use. The Quest records only one of casting or recording at a time, so stop casting before you record.
+The Quest's own camera can take photos and record video. Microphone audio is only recorded if the recording settings allow it, and while the app is using the microphone for speech the recording may come out quiet or silent; plan to add a voice-over. Recording and photos can't be started from your own app (the camera service is protected), but `adb` can take a photo over a cable, which a server button can use. The Quest records only one of casting or recording at a time, so stop casting before you record.
 
 ---
 
@@ -207,9 +259,11 @@ The Quest's own camera can take photos and record video. Recording and photos ca
 
 A cleaned-up copy of the viewer and server from this project is published as a standalone repository: <https://github.com/ukdavewood/solidcraft-quest-viewer> (licensed MIT or Apache-2.0, like SolidCraft's code). It is intended as something to read and start from, not a finished product. Meta's OpenXR loader library is not included; the README says where to get it.
 
+> **How current the sample code is:** the repository was last updated on **17 November 2026** (commit `b5a5e35`, "Sample code: Quest 3 viewer and AI remote for SolidCraft"). It covers Part 1 to Part 3 as they were on that day: the viewer, the server, voice, faces, edges and push/pull, setting the model down with the room raycast, sizing, photos and the access code. It does **not** include the later work in this guide: the Mac keys relay and Shift-move (Part 3), the near-surface set-down fix, and everything in **Part 4** (sketches, dimensions, constraints, the CAD adapter and the one-sketch test model). For those, ask Claude to build them from the descriptions in this guide, using the repository for the structure.
+
 **A tip for Claude Code:** you can ask Claude to read the repository first, so it learns the structure and the problems already solved, then build your own version. For example:
 
-> Read <https://github.com/ukdavewood/solidcraft-quest-viewer> (the README and `src/` and `tools/serve.py`). It is a working Quest 3 viewer and AI server for SolidCraft. Summarise how it is organised, then help me build my own version for my own models and setup, borrowing what is useful. Don't copy anything you don't understand.
+> Read <https://github.com/ukdavewood/solidcraft-quest-viewer> (the README and `src/` and `tools/serve.py`). It is a working Quest 3 viewer and AI server for SolidCraft as it was on 17 November 2026; it does not yet have the Mac keys relay, the sketch and dimension view, or the CAD adapter described in Part 3 and Part 4 of the guide. Summarise how it is organised, then help me build my own version for my own models and setup, borrowing what is useful and adding those features from the guide. Don't copy anything you don't understand.
 
 ## Resources
 
