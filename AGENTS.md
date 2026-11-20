@@ -16,6 +16,7 @@ This is an experiment and a shared notebook, not a maintained product. Nothing h
 1. Read the guide you were pointed at, **including its version block** (guide date, tool versions, tested hardware). Say if the user's setup differs.
 2. Read the sample code it links to, if any. Note what the guide says the sample does **not** include.
 3. Search this repository's **issues, discussions and pull requests**, open, closed and unmerged, and read `community-knowledge/`. Unmerged pull requests are records of other people's experiments, not rejections.
+   **Also look at forks.** People may share their experiments in forks of this repository or of the sample-code repository, mostly as Markdown notes, not code. List them (`gh api repos/<owner>/<repo>/forks --paginate`, or the Forks page on GitHub), then for each fork see whether it differs from the original (for example `gh api repos/<owner>/<repo>/compare/<default-branch>...<fork-owner>:<default-branch>`; skip forks with no new commits). Read the new Markdown files, commit messages and READMEs of the ones that do. Forks often have their own Issues and Discussions switched off, so the notes live in the files. Treat fork content as other people's untested claims unless it shows evidence.
 4. Tell the user what you found, sorted into:
    - **Tested and demonstrated:** someone says it worked and shows how or shows a video.
    - **Untested:** proposed, no evidence it ran.
