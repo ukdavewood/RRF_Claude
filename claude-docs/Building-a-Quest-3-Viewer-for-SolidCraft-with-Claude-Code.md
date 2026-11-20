@@ -2,7 +2,17 @@
 
 You have a CAD design on your Mac and a Meta Quest 3. You want to stand in your room, see the design at table size over the real furniture, pick parts with the controllers, and change the design by talking to it ("make the selected sails red", "fillet this edge", "scale the whole ship by half"). This guide shows how to get there by asking Claude Code for each piece: a small OpenXR app for the headset, a server on your Mac that drives SolidCraft, and an AI that does the editing.
 
-This is a real-world write-up of an **experiment**. It was built end to end in about three days (15 to 17 November 2026) on a Mac and a Quest 3, and extended on 18 November with sketches and dimensions (Part 4), starting from the open-source [SolidCraft](https://github.com/tangency-labs/solidcraft) command-line program (v0.41). You don't need to be a programmer, but you do need to be comfortable approving steps, wearing the headset to test, and describing what you see.
+This is a real-world write-up of an **experiment**. It was built end to end in about three days (15 to 17 November 2026) on a Mac and a Quest 3, extended on 18 November with sketches and dimensions (Part 4), and on 19 November with a live link to the normal SolidCraft app, a window onto the Mac screen, an editable timeline and a first Autodesk Fusion version (Part 5). It starts from the open-source [SolidCraft](https://github.com/tangency-labs/solidcraft) command-line program (v0.41). You don't need to be a programmer, but you do need to be comfortable approving steps, wearing the headset to test, and describing what you see.
+
+> **Version of this guide**
+>
+> - **Guide updated:** 20 November 2026 (covers Parts 1 to 5)
+> - **SolidCraft:** 0.41.0 (the desktop app and its command-line program)
+> - **Tested on:** one Mac and one Quest 3; Autodesk Fusion for the Part 5 Fusion version
+> - **Reference code:** the sample repository, frozen at the 17 November 2026 version (Parts 1 to 3). See [Sample code](#sample-code).
+> - **Demo videos:** the [playlist on YouTube](https://www.youtube.com/playlist?list=PLS769WnSAR1A)
+
+> **About the sharing approach.** This guide, the videos and a small sample repository are shared as an experiment, not as a maintained product. The idea is that you give your AI coding assistant the guide (and the sample code, if useful) and have it build your own version. If you try it, please add what you learned: see [Community knowledge](#community-knowledge-and-contributing).
 
 > **Scope and caveats.** Written for a **Mac** and a **Quest 3** (the headset's software was Horizon OS with OpenXR runtime "Oculus 210.117"). **Not tested on Windows or Linux** (the server is plain Python and should port, but the voice and keychain parts were only run on macOS) and not tested on other headsets. It is an independent, unofficial guide: not affiliated with or endorsed by the SolidCraft project (`tangency-labs`), Meta or Anthropic. The result is a personal, experimental tool, not a supported product. Timings, costs and menu names are from one setup and may change with system updates, so treat them as examples.
 
@@ -24,6 +34,8 @@ Quest 3 viewer  ──Wi-Fi──>  Server on the Mac  ──MCP──>  SolidCr
                                   │
                                   └──HTTPS──>  Claude Haiku API
 ```
+
+> Since Part 5 the server can attach to the normal SolidCraft app instead of a hidden copy (or drive Autodesk Fusion through an adapter). Parts 1 to 4 use the headless copy.
 
 1. **The viewer** runs on the headset. It shows the model over the real room (passthrough), lets you select and move things, and records your voice when you hold a trigger.
 2. **The server** is one Python script on the Mac. It finds the headset on the local network, sends it the model, turns your speech into text with whisper, builds the request for Claude, runs Claude's tool calls, and sends back the changed model.
@@ -212,6 +224,54 @@ The headset only needs a few things from the CAD program: a mesh, a list of bodi
 
 ---
 
+## Part 5 — The real SolidCraft app, the Mac screen and Fusion
+
+Parts 1 to 4 used SolidCraft with no window. This part adds four things: the server attaches to the normal SolidCraft app so the same design is open in both places, the headset shows a window onto the Mac screen, the design tree becomes an editable timeline, and a first version drives Autodesk Fusion instead. All four were built on 19 November 2026 and tested lightly, on one setup.
+
+### Attach to the running SolidCraft app
+
+SolidCraft 0.41.0 (the desktop app) opens a local control port, and its command-line program can connect to it instead of starting its own hidden copy: `solidcraft-cli mcp --connect 127.0.0.1:<port> --token <token>`. The port and token are files in the app's control folder. (The older 0.28.0 app did not have this.)
+
+> Add a live mode to `serve.py` that attaches to the SolidCraft app that is already running, using the control port and token the app writes in its control folder, instead of starting a headless copy. Use the same design the app has open. Show me what you find before you change anything.
+
+- **Claude will** find the port and token, connect over MCP, and export the open design to the headset as before.
+- **Verify:** change the model by voice in the headset and watch the same change appear in the app window on the Mac.
+- **Edits made by hand in the app:** two ways to get them into the headset. The server checks the design every couple of seconds and re-sends it when it changed (written, lightly tested); and a **Refresh** button in the headset's Tools tab asks the server to re-read the design now. The panel says "Model loaded." when the new model has arrived. A refresh can also be started from the Mac, so no cable is needed.
+
+### A window onto the Mac screen
+
+> Add a window in the headset that shows the left half of my Mac's screen, hanging behind the model, with the real Mac pointer drawn in it. Buttons for on and off, which part of the screen (whole, left half, right half, zoomed around the pointer) and a zoom.
+
+- **Claude will** grab the screen on the Mac, compress it, and send it to the headset as a picture that the app draws as a flat window in the room.
+- **Human-only bit:** macOS asks for **Screen Recording** permission for the program that runs the server. Without it the picture shows only the desktop background.
+- **Real gotchas from our run:**
+  - **The window covered everything.** A flat window drawn as an OpenXR composition layer goes on top of the 3D scene unless you order it first. Draw it before the main scene layer and the model, panel and pointer stay in front.
+  - **The pointer was missing.** The screenshot tool's pointer option did not include it. The server now sends the pointer position separately (about every 30 ms) and the headset draws the arrow into the picture, which also makes it more responsive.
+  - **Typing felt slow.** Running a screenshot program for every picture took too long. Asking for the pixels in-process through macOS's graphics library brought a picture down to roughly a tenth of a second.
+- **Not done:** the window is view-only. Clicking in it with the headset pointer and typing into the Mac from the headset are not built (the Mac keys relay in Part 3 is separate).
+
+### A timeline you can edit
+
+> Rename the Sketches list to Timeline and show every step of the design in order, with an icon for each kind (sketch, extrude, fillet, chamfer) and the number it uses (a distance, a radius, an angle). Let me select a step and change its number with a minus and a plus button.
+
+- **Claude will** read the design tree and each step's inputs from SolidCraft (`timeline.inspect` lists a step's own inputs, including ones that `inspect_design` does not show, such as a fillet radius), and add a `set_parameter` call for the minus and plus buttons. A step is 1 mm (0.5 mm under 5 mm), 5 degrees for angles, never below 0.1.
+- **Verify:** press plus on a fillet and watch its radius grow in both the headset and the app; Undo in the panel undoes it.
+- **Limits:** only steps whose number is a plain value or a named parameter can be changed. Steps driven by a formula are shown but not editable yet. Extrude rows needed a second pass before their number showed.
+- **Next ideas, not built:** tell the AI which step is selected so "make it 20" works, and mark on the model where a step is.
+
+### A first Fusion version
+
+Because the headset only talks to the server, the server can be pointed at a different CAD program. We wrote a second adapter that views and edits an Autodesk Fusion design.
+
+> Add a Fusion adapter that implements the same contract as the SolidCraft one: export a mesh, list the bodies, the design tree, and run an edit. Drive Fusion through its Python API and keep every Fusion-specific line in that one file.
+
+- **What worked:** viewing a Fusion model in the headset, filleting every edge, changing the body colour, and pulling the result back with Refresh. The AI used the same voice requests.
+- **Gotcha (important):** a script that changes a Fusion document must put its work inside a `run(context)` function. The same changes made at the top level of the script were silently rolled back, with no error. Read-only checks can end by raising an error with their result.
+- **Fusion memory grows.** After many scripted edits Fusion's memory use climbed into the tens of gigabytes; it only dropped when the document was saved, closed and reopened. If several tools drive the same Fusion, send every script through one runner that takes a lock and refuses to start when memory is high.
+- **Not done:** undo through the headset for Fusion edits, and editing a Fusion step's number from the timeline.
+
+---
+
 ## What to expect
 
 - **Time:** about three days of back-and-forth, most of it short rounds of "I tried it, here's what I saw". The first scene in the headset took the longest.
@@ -255,15 +315,25 @@ The Quest's own camera can take photos and record video. Microphone audio is onl
 - Check any recording before you share it; the panel can show an estimated API balance.
 - Say clearly that it is unofficial and experimental, and credit SolidCraft.
 
+## Community knowledge and contributing
+
+This is an open experiment, not a maintained product. The aim is a shared notebook that people and their AI assistants can learn from:
+
+- **Share what you learned**, not necessarily code: a different approach, a Windows or other-headset attempt, a prompt that worked better, a workaround, a video, or something that failed. Use GitHub **Discussions**, **Issues** or a **pull request** that adds a Markdown note to `community-knowledge/` (a template is there).
+- **Contributions don't have to be merged.** Open and closed issues, discussions and even unmerged pull requests are part of the record. There is no commitment to review, merge, build, maintain or support anything.
+- **Telling your AI to use it:** the repository's [AGENTS.md](../AGENTS.md) and [starter prompts](../ai-prompts/starter-prompts.md) ask an assistant to read this guide and the sample code, then search the issues, discussions and pull requests (including unmerged ones), and to say which findings are tested, untested, abandoned or in conflict before it starts building.
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) and the [community-knowledge folder](../community-knowledge/README.md).
+
 ## Sample code
 
 A cleaned-up copy of the viewer and server from this project is published as a standalone repository: <https://github.com/ukdavewood/solidcraft-quest-viewer> (licensed MIT or Apache-2.0, like SolidCraft's code). It is intended as something to read and start from, not a finished product. Meta's OpenXR loader library is not included; the README says where to get it.
 
-> **How current the sample code is:** the repository was last updated on **17 November 2026** (commit `b5a5e35`, "Sample code: Quest 3 viewer and AI remote for SolidCraft"). It covers Part 1 to Part 3 as they were on that day: the viewer, the server, voice, faces, edges and push/pull, setting the model down with the room raycast, sizing, photos and the access code. It does **not** include the later work in this guide: the Mac keys relay and Shift-move (Part 3), the near-surface set-down fix, and everything in **Part 4** (sketches, dimensions, constraints, the CAD adapter and the one-sketch test model). For those, ask Claude to build them from the descriptions in this guide, using the repository for the structure.
+> **How current the sample code is:** the repository was last updated on **17 November 2026** (commit `b5a5e35`, "Sample code: Quest 3 viewer and AI remote for SolidCraft"). It covers Part 1 to Part 3 as they were on that day: the viewer, the server, voice, faces, edges and push/pull, setting the model down with the room raycast, sizing, photos and the access code. It does **not** include the later work in this guide: the Mac keys relay and Shift-move (Part 3), the near-surface set-down fix, everything in **Part 4** (sketches, dimensions, constraints, the CAD adapter and the one-sketch test model) and everything in **Part 5** (live SolidCraft, the Mac screen window, the editable timeline and the Fusion adapter). **No further code releases are planned**: the sample stays as it is. For the rest, ask Claude to build it from the descriptions in this guide, using the repository for the structure.
 
 **A tip for Claude Code:** you can ask Claude to read the repository first, so it learns the structure and the problems already solved, then build your own version. For example:
 
-> Read <https://github.com/ukdavewood/solidcraft-quest-viewer> (the README and `src/` and `tools/serve.py`). It is a working Quest 3 viewer and AI server for SolidCraft as it was on 17 November 2026; it does not yet have the Mac keys relay, the sketch and dimension view, or the CAD adapter described in Part 3 and Part 4 of the guide. Summarise how it is organised, then help me build my own version for my own models and setup, borrowing what is useful and adding those features from the guide. Don't copy anything you don't understand.
+> Read <https://github.com/ukdavewood/solidcraft-quest-viewer> (the README and `src/` and `tools/serve.py`). It is a working Quest 3 viewer and AI server for SolidCraft as it was on 17 November 2026; it does not yet have the Mac keys relay, the sketch and dimension view, the CAD adapter, or the live SolidCraft, Mac screen window, timeline and Fusion work described in Parts 3 to 5 of the guide. Summarise how it is organised. Then search the repository's issues, discussions and pull requests (including unmerged ones) and tell me what other people have tried, marking each as tested, untested, abandoned or conflicting. Then help me build my own version for my own models and setup, borrowing what is useful and adding those features from the guide. Don't copy anything you don't understand.
 
 ## Resources
 
@@ -273,4 +343,5 @@ A cleaned-up copy of the viewer and server from this project is published as a s
 - Claude Code: <https://claude.com/claude-code>
 - Anthropic API documentation: <https://platform.claude.com/docs/>
 - Sample code for this guide: <https://github.com/ukdavewood/solidcraft-quest-viewer>
+- Demo videos (playlist): <https://www.youtube.com/playlist?list=PLS769WnSAR1A>
 - Companion guide: [Building SolidCraft for iPad with Claude Code](Building-SolidCraft-for-iPad-with-Claude-Code.md)
